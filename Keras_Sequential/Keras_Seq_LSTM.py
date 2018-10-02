@@ -9,6 +9,9 @@ timesteps = 8
 num_classes = 10
 batch_size = 32
 
+
+
+
 model = Sequential()
 model.add(LSTM(32, return_sequences=True, stateful=True,
                batch_input_shape=(batch_size, timesteps, data_dim)))
@@ -18,7 +21,8 @@ model.add(Dense(10, activation="softmax"))
 
 model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
-              metric=['accuracy'])
+              metrics=['accuracy'])
+
 
 # dummy data
 x_train = np.random.random((batch_size*10, timesteps, data_dim))
