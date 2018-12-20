@@ -471,11 +471,6 @@ for index, segment_list in enumerate(segmented_corpus):
         final = final + seg + ' '
   final_corpus.append([final[:-1], labels[index]])
 
-# todo: del
-# f = []
-# for i in range(30):
-#   for each in final_corpus:
-#     f.append(each)
     
 print("Example of final corpus: ", final_corpus[1])
 print("----------")
@@ -508,6 +503,7 @@ from sklearn.metrics import accuracy_score
 from sklearn import metrics
 from sklearn.model_selection import StratifiedKFold
 from sklearn.decomposition import KernelPCA
+from sklearn.externals import joblib
 
 """### Implementation of Naive Bayes"""
 
@@ -516,7 +512,7 @@ from collections import defaultdict
 from math import log
 
 
-class NaiveBayes:
+class MultinomialNB:
     """Hybrid implementation of Naive Bayes.
     Supports discrete and continuous features.
     """
@@ -633,13 +629,33 @@ X = df.context
 y = df.label
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=824)
 for train_index, test_index in skf.split(X, y):
-    print("TRAIN:", train_index, "TEST:", test_index)
+    
     X_train, X_test = X[train_index], X[test_index]
     y_train, y_test = y[train_index], y[test_index]
     NB_pipeline.fit(X_train, y_train)
     prediction = NB_pipeline.predict(X_test)
-#     print('Test accuracy is {}'.format(accuracy_score(y_test, prediction)))
     print(metrics.classification_report(y_test, prediction))
+
+"""#### One-Fold Validation for demonstrating
+Save model to Google Drive
+"""
+
+import time
+X = df.context
+y = df.label
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)
+NB_pipeline.fit(X_train, y_train)
+joblib.dump(NB_pipeline, "NB_model.m")
+
+"""Test for one fold"""
+
+X = df.context
+y = df.label
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)
+
+NB_pipeline = joblib.load("NB_model.m")
+prediction = NB_pipeline.predict(X_test)
+print(metrics.classification_report(y_test, prediction))
 
 """## Support Vector Machine 
 In machine learning, support vector machines (SVMs, also support vector networks) are supervised learning models with associated learning algorithms that analyze data used for classification and regression analysis. Given a set of training examples, each marked as belonging to one or the other of two categories, an SVM training algorithm builds a model that assigns new examples to one category or the other, making it a non-probabilistic binary linear classifier (although methods such as Platt scaling exist to use SVM in a probabilistic classification setting). An SVM model is a representation of the examples as points in space, mapped so that the examples of the separate categories are divided by a clear gap that is as wide as possible. New examples are then mapped into that same space and predicted to belong to a category based on which side of the gap they fall.
@@ -652,19 +668,16 @@ When data is unlabelled, supervised learning is not possible, and an unsupervise
 # Define a pipeline combining a text feature extractor with multi lable classifier
 l_svm = Pipeline([
                 ('tfidf', TfidfVectorizer()),
-#                 ('pca', KernelPCA(n_components=10)),
                 ('clf', OneVsRestClassifier(LinearSVC()))
             ])
 
 """### Test Performance of Basic Linear Kernel"""
 
 for train_index, test_index in skf.split(X, y):
-    print("TRAIN:", train_index, "TEST:", test_index)
     X_train, X_test = X[train_index], X[test_index]
     y_train, y_test = y[train_index], y[test_index]
     l_svm.fit(X_train, y_train)
     prediction = l_svm.predict(X_test)
-#     print('Test accuracy is {}'.format(accuracy_score(y_test, prediction)))
     print(metrics.classification_report(y_test, prediction))
 
 """## Further More: Deep Learning Method!
@@ -679,11 +692,14 @@ Text is considered a form of sequence data similar to time series data that you 
 This class allows to vectorize a text corpus, by turning each text into either a sequence of integers (each integer being the index of a token in a dictionary) or into a vector where the coefficient for each token could be binary, based on word count, based on tf-idf...
 """
 
+import pandas as pd
 from keras.preprocessing.text import Tokenizer
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.utils import to_categorical
+from keras.models import load_model
 
+df = pd.read_csv("Jiandan_segment.csv")
 X = df.context
 # convert Chinese to number 
 label_dict = {'人类': 0,
@@ -723,6 +739,8 @@ from keras.utils import plot_model
 from IPython.display import SVG
 from keras.utils.vis_utils import model_to_dot
 from keras import regularizers
+from keras.preprocessing.sequence import pad_sequences
+import numpy as np
 
 embedding_dim = 50
 
@@ -767,9 +785,6 @@ def plot_history(history):
     plt.title('Validation loss')
     plt.legend()
 
-from keras.preprocessing.sequence import pad_sequences
-import numpy as np
-
 X_train, X_test, y_train, y_test = train_test_split(X_token, y_cate, test_size=0.5, random_state=824, shuffle=True)
 
 X_train, X_test = pad_sequences(X_train, padding='post', maxlen=400),\
@@ -781,6 +796,7 @@ history = mlp.fit(X_train, y_train,
                   validation_data=(X_test, y_test),
                   batch_size=32)
 
+mlp.save('MLP_model.h5')
 loss, accuracy = mlp.evaluate(X_train, y_train, verbose=False)
 print("Training Accuracy: {:.4f}".format(accuracy))
 loss, accuracy = mlp.evaluate(X_test, y_test, verbose=False)
@@ -841,6 +857,7 @@ history = Conv.fit(X_train, y_train,
                    validation_data=(X_test, y_test),
                    batch_size=32)
 
+Conv.save('MLP_model.h5')
 loss, accuracy = Conv.evaluate(X_train, y_train, verbose=False)
 print("Training Accuracy: {:.4f}".format(accuracy))
 loss, accuracy = Conv.evaluate(X_test, y_test, verbose=False)
@@ -855,7 +872,9 @@ print(metrics.classification_report(Conv_train, np.argmax(y_train, axis=1)))
 print("Testing results:")
 print(metrics.classification_report(Conv_pred, np.argmax(y_test, axis=1)))
 
-"""#### Deeper CNN"""
+"""#### Deeper CNN
+Let us check out whether a deeper CNN can improve the performance of text classification.
+"""
 
 embedding_dim = 100
 
@@ -880,25 +899,26 @@ SVG(model_to_dot(D_Conv, show_shapes=True, show_layer_names=False).create(prog='
 from keras.preprocessing.sequence import pad_sequences
 import numpy as np
 
-history = Conv.fit(X_train, y_train,
-                   epochs=15,
+history = D_Conv.fit(X_train, y_train,
+                   epochs=1,
                    verbose=0,
                    validation_data=(X_test, y_test),
                    batch_size=32)
 
-loss, accuracy = Conv.evaluate(X_train, y_train, verbose=False)
+D_conv = load_model('Dconv_model.h5')
+loss, accuracy = D_Conv.evaluate(X_train, y_train, verbose=False)
 print("Training Accuracy: {:.4f}".format(accuracy))
-loss, accuracy = Conv.evaluate(X_test, y_test, verbose=False)
+loss, accuracy = D_Conv.evaluate(X_test, y_test, verbose=False)
 print("Testing Accuracy:  {:.4f}".format(accuracy))
-plot_history(history)
+# plot_history(history)
 
 
-Conv_train = Conv.predict_classes(X_train)
-Conv_pred = Conv.predict_classes(X_test)
+D_Conv_train = D_Conv.predict_classes(X_train)
+D_Conv_pred = D_Conv.predict_classes(X_test)
 print("Training results:")
-print(metrics.classification_report(Conv_train, np.argmax(y_train, axis=1)))
+print(metrics.classification_report(D_Conv_train, np.argmax(y_train, axis=1)))
 print("Testing results:")
-print(metrics.classification_report(Conv_pred, np.argmax(y_test, axis=1)))
+print(metrics.classification_report(D_Conv_pred, np.argmax(y_test, axis=1)))
 
 """### RNN
 A recurrent neural network (RNN) is a class of artificial neural network where connections between nodes form a directed graph along a sequence. This allows it to exhibit temporal dynamic behavior for a time sequence. Unlike feedforward neural networks, RNNs can use their internal state (memory) to process sequences of inputs. This makes them applicable to tasks such as unsegmented, connected handwriting recognition or speech recognition.
